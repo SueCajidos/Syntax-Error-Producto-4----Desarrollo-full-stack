@@ -1,172 +1,110 @@
-// index.js
-
-// ---------------------
-// IMPORTACIONES BÁSICAS
-// ---------------------
-const express = require('express');
+// ---------------- CONFIG BÁSICA ----------------
+require('dotenv').config();
+const express        = require('express');
+const cors           = require('cors');
 const { graphqlHTTP } = require('express-graphql');
 const { buildSchema } = require('graphql');
-const cors = require('cors'); // Para evitar problemas CORS
 
-// -----------------------------
-// IMPORTAMOS LOS MODELOS (MEMORIA)
-// -----------------------------
-const Usuario = require('./mvc/modelo/Usuario');
-const Voluntariado = require('./mvc/modelo/Voluntariado');
+const connectDB = require('./server/config/db');
+connectDB();
 
-// Estructuras de memoria para simular la persistencia
-const usuarios = [];
-const voluntariados = [];
-// ---------------------
-// CONEXIÓN A MONGODB
-// ---------------------
-const { MongoClient, ObjectId } = require('mongodb');
-const uri = 'mongodb://localhost:27017';
-const client = new MongoClient(uri);
-let db;
+const Usuario      = require('./server/models/Usuario');
+const Voluntariado = require('./server/models/Voluntariado');
 
-client.connect()
-  .then(() => {
-    db = client.db('producto3');
-    console.log(" Conectado a MongoDB - Base de datos: producto3");
-  })
-  .catch(err => console.error(" Error al conectar a MongoDB:", err));
-// -----------------------------
-// DEFINIMOS EL ESQUEMA GRAPHQL
-// -----------------------------
+// ---------------- ESQUEMA ----------------------
 const schema = buildSchema(`
-
-  # Tipos de datos
   type Usuario {
-    nombre: String
-    correo: String
-    password: String
+    id: ID!
+    nombre: String!
+    correo: String!
+    password: String!
   }
 
   type Voluntariado {
-    id: ID
-    titulo: String
-    usuario: String
-    fecha: String
+    id: ID!
+    titulo: String!
+    usuario: Usuario!
+    fecha: String!
     descripcion: String
-    tipo: String
+    tipo: String!
   }
 
-  # Consultas
   type Query {
     obtenerUsuarios: [Usuario]
     obtenerVoluntariados: [Voluntariado]
   }
 
-  # Mutaciones
   type Mutation {
-    crearUsuario(nombre: String!, correo: String!, password: String!): Usuario
-    eliminarUsuario(correo: String!): Boolean
+    crearUsuario(nombre:String!, correo:String!, password:String!): Usuario
+    eliminarUsuario(correo:String!): Boolean
+    login(correo:String!, password:String!): Boolean
 
-    crearVoluntariado(id: ID!, titulo: String!, usuario: String!, fecha: String!, descripcion: String!, tipo: String!): Voluntariado
-    eliminarVoluntariado(id: ID!): Boolean
+    crearVoluntariado(
+      titulo:String!, usuario:String!,
+      fecha:String!,  descripcion:String!, tipo:String!
+    ): Voluntariado
+
+    eliminarVoluntariado(id:ID!): Boolean
   }
 `);
 
-// -----------------------------
-// DEFINIMOS LOS RESOLVERS
-// -----------------------------
+// ---------------- RESOLVERS --------------------
 const root = {
-  // ----------- USUARIOS -----------
-  obtenerUsuarios: async () => {
-    const coleccion = db.collection('usuarios');
-    const resultado = await coleccion.find().toArray();
-    return resultado;
-
-    /*
-    return usuarios;
-    */
-  },
+  /* --- USUARIOS --- */
+  obtenerUsuarios: async () =>
+    (await Usuario.find()).map(u => ({ id: u._id.toString(), ...u.toObject() })),
 
   crearUsuario: async ({ nombre, correo, password }) => {
-    const coleccion = db.collection('usuarios');
-    const existe = await coleccion.findOne({ correo: correo });
-    if (existe) {
-      throw new Error("Correo ya registrado");
-    }
-    const nuevo = { nombre, correo, password };
-    await coleccion.insertOne(nuevo);
-    return nuevo;
+    if (await Usuario.exists({ correo })) throw new Error('Correo ya registrado');
 
-    /*
-    if (usuarios.find(u => u.correo === correo)) {
-      throw new Error("Correo ya registrado");
-    }
-    const nuevo = new Usuario(nombre, correo, password);
-    usuarios.push(nuevo);
-    return nuevo;
-    */
+    const doc = await Usuario.create({ nombre, correo, password });
+    console.log('👍 insertado →', doc);               // ← lo verás en consola
+    return { id: doc._id.toString(), ...doc.toObject() };
   },
 
-  eliminarUsuario: async ({ correo }) => {
-    const coleccion = db.collection('usuarios');
-    const resultado = await coleccion.deleteOne({ correo: correo });
-    return resultado.deletedCount > 0;
+  eliminarUsuario: async ({ correo }) =>
+    (await Usuario.deleteOne({ correo })).deletedCount > 0,
 
-    /*
-    const index = usuarios.findIndex(u => u.correo === correo);
-    if (index === -1) return false;
-    usuarios.splice(index, 1);
-    return true;
-    */
+  login: async ({ correo, password }) => {
+    const usr = await Usuario.findOne({ correo });
+    return usr ? password === usr.password : false;   // comparación directa
   },
 
-  // ----------- VOLUNTARIADOS -----------
+  /* --- VOLUNTARIADOS --- */
   obtenerVoluntariados: async () => {
-    const coleccion = db.collection('voluntariados');
-    const resultado = await coleccion.find().toArray();
-    return resultado;
-
-    /*
-    return voluntariados;
-    */
+    const vol = await Voluntariado.find().populate('usuario', 'nombre correo');
+    return vol.map(v => ({
+      id:   v.id,
+      titulo: v.titulo,
+      usuario: v.usuario,                    // { nombre, correo }
+      fecha: v.fecha.toISOString().slice(0, 10), // ← "YYYY-MM-DD"
+      descripcion: v.descripcion,
+      tipo:  v.tipo
+    }));
   },
 
-  crearVoluntariado: async ({ id, titulo, usuario, fecha, descripcion, tipo }) => {
-    const coleccion = db.collection('voluntariados');
-    const nuevo = { id, titulo, usuario, fecha, descripcion, tipo };
-    await coleccion.insertOne(nuevo);
-    return nuevo;
+  crearVoluntariado: async ({ titulo, usuario, fecha, descripcion, tipo }) => {
+    const autor = await Usuario.findOne({ correo: usuario });
+    if (!autor) throw new Error('Usuario no existe');
 
-    /*
-    const nuevo = new Voluntariado(id, titulo, usuario, fecha, descripcion, tipo);
-    voluntariados.push(nuevo);
-    return nuevo;
-    */
+    const doc = await Voluntariado.create({
+      titulo, usuario: autor._id, fecha, descripcion, tipo
+    });
+
+    // devolvemos objeto completo para pruebas (el front no lo usa)
+    return { id: doc.id, titulo, usuario: autor, fecha, descripcion, tipo };
   },
 
-  eliminarVoluntariado: async ({ id }) => {
-    const coleccion = db.collection('voluntariados');
-    const resultado = await coleccion.deleteOne({ id: id });
-    return resultado.deletedCount > 0;
-
-    /*
-    const index = voluntariados.findIndex(v => v.id == id);
-    if (index === -1) return false;
-    voluntariados.splice(index, 1);
-    return true;
-    */
-  }
+  eliminarVoluntariado: async ({ id }) =>
+    (await Voluntariado.deleteOne({ _id: id })).deletedCount > 0
 };
 
-// -----------------------------
-// CONFIGURACIÓN DEL SERVIDOR
-// -----------------------------
+// ---------------- SERVER -----------------------
 const app = express();
 app.use(cors());
+app.use('/graphql', graphqlHTTP({ schema, rootValue: root, graphiql: true }));
 
-app.use('/graphql', graphqlHTTP({
-  schema: schema,
-  rootValue: root,
-  graphiql: true,
-}));
-
-const PORT = 4000;
-app.listen(PORT, () => {
-  console.log(`Servidor corriendo en http://localhost:${PORT}/graphql`);
-});
+const PORT = process.env.PORT || 4000;
+app.listen(PORT, () =>
+  console.log(`🚀  GraphQL listo → http://localhost:${PORT}/graphql`)
+);
