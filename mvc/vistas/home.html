@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Voluntariado</title>
+
+  <!-- Bootstrap CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <link rel="stylesheet" href="../styles.css">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@300..700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+  <header class="header">
+    <div class="title">Voluntariado</div>
+    <nav class="nav">
+      <div class="nav-item"><a href="home.html">Inicio</a></div>
+      <div class="nav-item"><a href="usuarios.html">Usuario</a></div>
+      <div class="nav-item"><a href="voluntariados.html">Voluntarios</a></div>
+    </nav>
+    <nav class="nav">
+      <div class="nav-item" id="navUsuario"><a href="inicioSesion.html">Login</a></div>
+      <div class="nav-item" id="registerLink"><a href="#">Register</a></div>
+    </nav>
+  </header>
+
+  <div class="container">
+    <main class="main text-center py-4">
+      <h1 class="dashboard-title">DASHBOARD DE VOLUNTARIADO SOBRE MASCOTAS</h1>
+
+      <section class="about-us my-4">
+        <h2 class="mb-3">¿Quiénes somos?</h2>
+        <p class="fs-4">
+          Somos un grupo de personas que comparte un sueño: darle una segunda oportunidad a los animales que más lo
+          necesitan. En nuestro voluntariado, trabajamos cada día con amor y compromiso para rescatar, cuidar y
+          encontrar hogares llenos de cariño para perros y gatos en situación de abandono. Creemos que cada patita
+          cuenta y que juntos podemos construir un mundo mejor, donde todos los animales sean respetados y amados.
+          ¡Súmate a nuestra misión y sé parte del cambio que ellos merecen!
+        </p>
+      </section>
+
+      <section class="volunteering-types my-4">
+        <h2 class="mb-3">Ofertas y Peticiones de Voluntariado (Arrastra para seleccionar)</h2>
+        <div id="voluntariadosContainer" class="volunteering-cards g-4">
+          <!-- Se llenará dinámicamente con tarjetas arrastrables -->
+        </div>
+      </section>
+
+      <!-- 👇 Solo visible para administradores -->
+      <section id="zonaAdmin">
+        <section id="seleccionVoluntariadosSection" class="my-4">
+          <h2 class="mb-3">Tu Selección (Suelta aquí)</h2>
+          <div id="seleccionVoluntariadosContainer" class="volunteering-cards g-4">
+            <p>Aquí se mostraría una selección de voluntariados.</p>
+          </div>
+          <!-- ✅ Botón para vaciar selección -->
+          <button id="vaciarSeleccion" class="btn btn-secondary mt-3">Vaciar selección</button>
+        </section>
+      </section>
+
+    </main>
+  </div>
+
+  <!-- Controlador del Menú -->
+  <script type="module" src="../Controlador/menuControlador.js"></script>
+
+  <!-- NUEVO: Controlador específico para la lógica de Home (incluye Drag & Drop) -->
+  <script type="module" src="../Controlador/int_1_dashboard.js"></script>
+
+  <!-- Scripts Externos Requeridos -->
+  <script src="https://code.jquery.com/jquery-3.7.1.min.js"
+    integrity="sha256-/JqT3SQfawRcv/BIHPThkBvs0OEvtFFmqPF/lYI/Cxo=" crossorigin="anonymous"></script>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+</body>
+
+</html>

@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Voluntariado – Consulta y Alta</title>
+
+  <!-- Bootstrap -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="../styles.css">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@300..700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+  <header class="header">
+    <div class="title">Voluntariado</div>
+
+    <nav class="nav">
+      <div class="nav-item"><a href="home.html">Inicio</a></div>
+      <div class="nav-item"><a href="usuarios.html">Usuario</a></div>
+      <div class="nav-item"><a href="voluntariados.html">Voluntarios</a></div>
+    </nav>
+
+    <nav class="nav">
+      <div class="nav-item" id="navUsuario"><a href="inicioSesion.html">Login</a></div>
+      <div class="nav-item" id="registerLink"><a href="#">Register</a></div>
+    </nav>
+  </header>
+
+  <div class="container">
+    <!-- ---------- LISTADO Y GRÁFICO SOLO PARA ADMIN ---------- -->
+    <main class="consulta-borrador-container">
+      <h1 class="consulta-borrador-title">Consulta y Borrador de Voluntariados</h1>
+      <table id="tablaVoluntariados" class="voluntariados-table">
+        <thead>
+          <tr>
+            <th>Título</th><th>Usuario</th><th>Fecha</th>
+            <th>Descripción</th><th>Tipo</th><th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody id="tablaCuerpo"></tbody>
+      </table>
+    </main>
+
+    <section class="grafico-voluntariados-container">
+      <h2 class="grafico-voluntariados-title">Distribución de Voluntariados por Usuario</h2>
+      <canvas id="graficoVoluntariados" width="700" height="300"></canvas>
+    </section>
+
+    <!-- ---------- ALTA VOLUNTARIADO ---------- -->
+    <section class="alta-voluntariado-container">
+      <h2 class="alta-voluntariado-title">Alta de Voluntariado</h2>
+      <form id="formVoluntariado">
+        <div class="input-group">
+          <label for="titulo">Título</label>
+          <input type="text" id="titulo" placeholder="Escribe el título" required>
+        </div>
+
+        <div class="input-group">
+          <label for="usuario">Usuario</label>
+          <input type="text" id="usuario" readonly required>
+        </div>
+
+        <div class="input-group">
+          <label for="fecha">Fecha</label>
+          <input type="date" id="fecha" required>
+        </div>
+
+        <div class="input-group">
+          <label for="descripcion">Descripción</label>
+          <textarea id="descripcion" placeholder="Describe la actividad" required></textarea>
+        </div>
+
+        <div class="input-group">
+          <label for="tipo">Tipo</label>
+          <select id="tipo" required>
+            <option value="Petición">Petición</option>
+            <option value="Oferta">Oferta</option>
+          </select>
+        </div>
+
+        <button type="submit" class="alta-button btn btn-primary">Dar de Alta</button>
+      </form>
+    </section>
+
+    <footer class="footer"></footer>
+  </div>
+
+  <!-- Controladores principales -->
+  <script type="module" src="../Controlador/int_3_voluntariados.js"></script>
+  <script type="module" src="../Controlador/menuControlador.js"></script>
+
+  <!-- Bloqueo del formulario si no hay sesión -->
+  <script type="module">
+    import { obtenerUsuarioActivo, obtenerVoluntariados, eliminarVoluntariado } from "../modelo/almacenaje.js";
+
+    document.addEventListener("DOMContentLoaded", async () => {
+      const usr = obtenerUsuarioActivo();
+      const form = document.getElementById("formVoluntariado");
+      const inpCorreo = document.getElementById("usuario");
+      const tablaCuerpo = document.getElementById("tablaCuerpo");
+
+      // Verificar si el usuario está logueado
+      if (usr) {
+        inpCorreo.value = usr.correo;
+
+        // Cargar voluntariados según el rol
+        const voluntariados = await obtenerVoluntariados();
+
+        // Limpiar tabla antes de agregar los nuevos voluntariados
+        tablaCuerpo.innerHTML = '';
+
+        if (usr.rol === 'admin') {
+          // Si es admin, mostrar todos los voluntariados
+          voluntariados.forEach(voluntariado => {
+            tablaCuerpo.insertAdjacentHTML('beforeend', `
+              <tr>
+                <td>${voluntariado.titulo}</td>
+                <td>${voluntariado.usuario.correo}</td>
+                <td>${voluntariado.fecha}</td>
+                <td>${voluntariado.descripcion}</td>
+                <td>${voluntariado.tipo}</td>
+                <td>
+                  <button class="btn btn-danger btn-sm borrar" data-id="${voluntariado.id}">
+                    Borrar
+                  </button>
+                </td>
+              </tr>
+            `);
+          });
+        } else if (usr.rol === 'usuario') {
+          // Si es usuario, mostrar solo sus voluntariados
+          const misVoluntariados = voluntariados.filter(v => v.usuario.correo === usr.correo);
+          misVoluntariados.forEach(voluntariado => {
+            tablaCuerpo.insertAdjacentHTML('beforeend', `
+              <tr>
+                <td>${voluntariado.titulo}</td>
+                <td>${voluntariado.usuario.correo}</td>
+                <td>${voluntariado.fecha}</td>
+                <td>${voluntariado.descripcion}</td>
+                <td>${voluntariado.tipo}</td>
+                <td>
+                  <button class="btn btn-danger btn-sm borrar" data-id="${voluntariado.id}">Borrar</button>
+                </td>
+              </tr>
+            `);
+          });
+        }
+
+        // Lógica para eliminar voluntariado
+        tablaCuerpo.querySelectorAll('.borrar').forEach(b =>
+          b.onclick = async e => {
+            const id = e.target.dataset.id;
+            await eliminarVoluntariado(id);
+            await cargarVoluntariados();
+          }
+        );
+      } else {
+        // Si no está logueado, deshabilitar todo
+        Array.from(form.elements).forEach(el => el.disabled = true);
+        form.querySelector('button[type="submit"]')?.remove();
+
+        const aviso = document.createElement("div");
+        aviso.className = "alert alert-warning mt-3";
+        aviso.innerHTML = `
+          <strong>Atención:</strong> debes
+          <a href="inicioSesion.html" class="alert-link">iniciar sesión</a>
+          para poder dar de alta un voluntariado.
+        `;
+        form.parentElement.insertBefore(aviso, form);
+      }
+    });
+  </script>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
