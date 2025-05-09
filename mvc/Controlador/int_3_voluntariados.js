@@ -1,4 +1,3 @@
-// mvc/Controlador/int_3_voluntariados.js
 // --------------------------------------------------------------
 //  Vista «Voluntariados»  – consume el backend GraphQL
 // --------------------------------------------------------------
@@ -17,14 +16,32 @@ const inpMail = document.getElementById('usuario');
 const canvas  = document.getElementById('graficoVoluntariados');
 const ctx     = canvas.getContext('2d');
 
-/* ==============================================================
+/* ============================================================== 
  * TABLA
  * ==============================================================*/
 export async function cargarTabla () {
+  const usuario = obtenerUsuarioActivo();
   tbody.innerHTML = '';
-  const lista = await obtenerVoluntariados();           // ⇠ viene del backend
+
+  let lista = await obtenerVoluntariados();
+
+  // 🔐 Filtrar si no es admin
+  if (usuario?.rol !== 'admin') {
+    lista = lista.filter(v => v.usuario.correo === usuario.correo);
+  }
+
+  if (usuario) {
+    // Mostrar tabla si hay usuario
+    document.querySelector(".consulta-borrador-container").style.display = "block";
+  } else {
+    // Ocultar tabla si no hay usuario
+    document.querySelector(".consulta-borrador-container").style.display = "none";
+  }
 
   lista.forEach(v => {
+    // 🔍 Solo mostrar botón de borrar si es admin o autor
+    const puedeBorrar = usuario?.rol === 'admin' || usuario?.correo === v.usuario.correo;
+
     tbody.insertAdjacentHTML('beforeend', `
       <tr>
         <td>${v.titulo}</td>
@@ -33,9 +50,10 @@ export async function cargarTabla () {
         <td>${v.descripcion}</td>
         <td>${v.tipo}</td>
         <td>
-          <button class="btn btn-danger btn-sm borrar" data-id="${v.id}">
-            Borrar
-          </button>
+          ${puedeBorrar ? `
+            <button class="btn btn-danger btn-sm borrar" data-id="${v.id}">
+              Borrar
+            </button>` : `<span class="text-muted">—</span>`}
         </td>
       </tr>`);
   });
@@ -43,16 +61,17 @@ export async function cargarTabla () {
   /* — borrar — */
   tbody.querySelectorAll('.borrar').forEach(b =>
     b.onclick = async e => {
-      await eliminarVoluntariado(e.target.dataset.id);
+      const id = e.target.dataset.id;
+      await eliminarVoluntariado(id);
       await cargarTabla();
       dibujarGrafico();
     });
 }
 
-/* ==============================================================
- * ALTA
- * ==============================================================*/
-async function altaVoluntariado (ev) {
+// ============================================================== 
+// ALTA
+// ============================================================== 
+async function altaVoluntariado(ev) {
   ev.preventDefault();
 
   const usr = obtenerUsuarioActivo();
@@ -62,21 +81,33 @@ async function altaVoluntariado (ev) {
     return;
   }
 
+  // Verificar si ya existe un voluntariado con el mismo título y usuario
+  const voluntariados = await obtenerVoluntariados();
+  const voluntariadoExistente = voluntariados.some(v =>
+    v.titulo === titulo.value && v.usuario.correo === usr.correo && v.fecha === fecha.value
+  );
+
+  if (voluntariadoExistente) {
+    alert('Ya existe un voluntariado con estos datos.');
+    return;
+  }
+
+  // Si no existe, guardar el nuevo voluntariado
   await guardarVoluntariado({
-    titulo:       titulo.value,
-    usuario:      usr.correo,
-    fecha:        fecha.value,
-    descripcion:  descripcion.value,
-    tipo:         tipo.value
+    titulo: titulo.value,
+    usuario: usr.correo,
+    fecha: fecha.value,
+    descripcion: descripcion.value,
+    tipo: tipo.value
   });
 
   form.reset();
-  inpMail.value = usr.correo;          // repone el correo
+  inpMail.value = usr.correo; // repone el correo
   await cargarTabla();
   dibujarGrafico();
 }
 
-/* ==============================================================
+/* ============================================================== 
  * GRÁFICO
  * ==============================================================*/
 async function dibujarGrafico () {
@@ -122,7 +153,7 @@ async function dibujarGrafico () {
   });
 }
 
-/* ==============================================================
+/* ============================================================== 
  * INIT
  * ==============================================================*/
 document.addEventListener('DOMContentLoaded', async () => {

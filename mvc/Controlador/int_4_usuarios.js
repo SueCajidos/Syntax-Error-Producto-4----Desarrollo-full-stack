@@ -4,33 +4,49 @@
 import {
   obtenerUsuarios,
   guardarUsuario,
-  eliminarUsuario
+  eliminarUsuario,
+  obtenerUsuarioActivo
 } from '../modelo/almacenaje.js';
 
 // ---------- helpers ----------
-const filaHTML = u => `
+const filaHTML = (u, esAdmin) => `
   <tr>
      <td>${u.nombre}</td>
      <td>${u.correo}</td>
      <td>${u.password}</td>
      <td>
-       <button class="btn btn-sm btn-danger borrar" data-correo="${u.correo}">
-         Borrar
-       </button>
+       ${esAdmin
+         ? `<button class="btn btn-sm btn-danger borrar" data-correo="${u.correo}">
+              Borrar
+            </button>`
+         : `<span class="text-muted">—</span>`}
      </td>
   </tr>`;
 
 // ---------- listado ----------
 async function pintarTabla () {
-  const tbody = document.getElementById('tablaUsuarios');
-  tbody.innerHTML = (await obtenerUsuarios()).map(filaHTML).join('');
+  const tbody   = document.getElementById('tablaUsuarios');
+  const usuario = obtenerUsuarioActivo();
+  const esAdmin = usuario?.rol === "admin";
 
-  tbody.querySelectorAll('.borrar').forEach(btn => {
-    btn.onclick = async e => {
-      await eliminarUsuario(e.target.dataset.correo);
-      pintarTabla();
-    };
-  });
+  // Si no hay sesión, ocultar tabla y salir
+  const tablaContenedor = document.querySelector(".consulta-borrador-container");
+  if (!usuario && tablaContenedor) {
+    tablaContenedor.style.display = "none";
+    return;
+  }
+
+  const lista = await obtenerUsuarios();
+  tbody.innerHTML = lista.map(u => filaHTML(u, esAdmin)).join('');
+
+  if (esAdmin) {
+    tbody.querySelectorAll('.borrar').forEach(btn => {
+      btn.onclick = async e => {
+        await eliminarUsuario(e.target.dataset.correo);
+        pintarTabla();
+      };
+    });
+  }
 }
 
 // ---------- alta ----------

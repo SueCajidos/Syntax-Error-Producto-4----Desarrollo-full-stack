@@ -3,7 +3,6 @@
 //  Menú superior: muestra usuario activo y permite cerrar sesión
 // --------------------------------------------------------------
 
-// ⇣ Ruta a tu carpeta `modelo`
 import { obtenerUsuarioActivo, cerrarSesion } from "../Modelo/almacenaje.js";
 
 /* ----------  PINTAR MENÚ  ---------- */
@@ -17,7 +16,7 @@ function mostrarUsuarioActivo() {
   if (usuario) {
     navUsuario.innerHTML = `
       <span>${(usuario.nombre ?? usuario.correo)
-        .charAt(0).toUpperCase() + (usuario.nombre ?? usuario.correo).slice(1)}</span>
+        .charAt(0).toUpperCase() + (usuario.nombre ?? usuario.correo).slice(1)} (${usuario.rol})</span>
       <button id="cerrarSesion" class="btn btn-sm btn-danger">
         Cerrar sesión
       </button>`;
@@ -29,6 +28,13 @@ function mostrarUsuarioActivo() {
       });
 
     registerLink && (registerLink.style.display = "none");
+
+    //  Ocultar elementos de administración si no es admin
+    if (usuario.rol !== 'admin') {
+      const zonaAdmin = document.getElementById("zonaAdmin");
+      zonaAdmin && (zonaAdmin.style.display = "none");
+    }
+
   } else {
     navUsuario.innerHTML = `
       <span class="me-2">-no login-</span>

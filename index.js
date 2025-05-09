@@ -14,10 +14,11 @@ const Voluntariado = require('./server/models/Voluntariado');
 // ---------------- ESQUEMA ----------------------
 const schema = buildSchema(`
   type Usuario {
-    id: ID!
-    nombre: String!
-    correo: String!
-    password: String!
+  id: ID!
+  nombre: String!
+  correo: String!
+  password: String!
+  rol: String!
   }
 
   type Voluntariado {
@@ -35,10 +36,10 @@ const schema = buildSchema(`
   }
 
   type Mutation {
-    crearUsuario(nombre:String!, correo:String!, password:String!): Usuario
+    crearUsuario(nombre:String!, correo:String!, password:String!, rol:String): Usuario
     eliminarUsuario(correo:String!): Boolean
-    login(correo:String!, password:String!): Boolean
-
+    login(correo:String!, password:String!): Usuario
+    
     crearVoluntariado(
       titulo:String!, usuario:String!,
       fecha:String!,  descripcion:String!, tipo:String!
@@ -54,10 +55,10 @@ const root = {
   obtenerUsuarios: async () =>
     (await Usuario.find()).map(u => ({ id: u._id.toString(), ...u.toObject() })),
 
-  crearUsuario: async ({ nombre, correo, password }) => {
+  crearUsuario: async ({ nombre, correo, password, rol }) => {
     if (await Usuario.exists({ correo })) throw new Error('Correo ya registrado');
 
-    const doc = await Usuario.create({ nombre, correo, password });
+    const doc = await Usuario.create({ nombre, correo, password, rol });
     console.log('👍 insertado →', doc);               // ← lo verás en consola
     return { id: doc._id.toString(), ...doc.toObject() };
   },
@@ -66,9 +67,17 @@ const root = {
     (await Usuario.deleteOne({ correo })).deletedCount > 0,
 
   login: async ({ correo, password }) => {
-    const usr = await Usuario.findOne({ correo });
-    return usr ? password === usr.password : false;   // comparación directa
-  },
+  const usr = await Usuario.findOne({ correo });
+  if (!usr || usr.password !== password) return null;
+
+  return {
+    id: usr._id.toString(),
+    nombre: usr.nombre,
+    correo: usr.correo,
+    rol: usr.rol
+  };
+},
+
 
   /* --- VOLUNTARIADOS --- */
   obtenerVoluntariados: async () => {

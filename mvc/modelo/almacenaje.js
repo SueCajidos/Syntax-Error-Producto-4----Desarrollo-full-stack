@@ -82,15 +82,24 @@ export async function eliminarVoluntariado(id) {
 
 /* ---------- SESIÓN (localStorage) ---------- */
 export async function loguearUsuario(correo, password) {
-  const m = `mutation($c:String!,$p:String!){
-               login(correo:$c, password:$p) }`;
+  const m = `mutation($c:String!, $p:String!) {
+               login(correo: $c, password: $p) {
+                 id
+                 nombre
+                 correo
+                 rol
+               }
+             }`;
   const { login } = await gql(m, { c: correo, p: password });
+
   if (login) {
-    const usr = (await obtenerUsuarios()).find(u => u.correo === correo);
-    localStorage.setItem('usuarioActivo', JSON.stringify(usr));
+    localStorage.setItem('usuarioActivo', JSON.stringify(login));
+    return true;
   }
-  return login;
+
+  return false;
 }
+
 
 export const obtenerUsuarioActivo = () =>
   JSON.parse(localStorage.getItem('usuarioActivo') || 'null');

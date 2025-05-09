@@ -1,17 +1,10 @@
-// controlador/int_1_dashboard.js
-// --------------------------------------------------------------
-//  Dashboard Home  — carga voluntariados desde el backend
-// --------------------------------------------------------------
-
 import { obtenerVoluntariados } from "../modelo/almacenaje.js";
 
 const voluntariadosContainer = document.getElementById("voluntariadosContainer");
-const seleccionContainer     = document.getElementById("seleccionVoluntariadosContainer");
-
-/* ----------  Drag & Drop helpers  ---------- */
+const seleccionContainer = document.getElementById("seleccionVoluntariadosContainer");
 
 function handleDragStart(e) {
-  e.dataTransfer.setData("text/plain", e.target.id);
+  e.dataTransfer.setData("text/plain", e.target.id); // Guarda el ID del voluntariado
   e.dataTransfer.effectAllowed = "move";
 }
 
@@ -23,7 +16,7 @@ function handleDragOver(e) {
 function handleDrop(e) {
   e.preventDefault();
   const cardId = e.dataTransfer.getData("text/plain");
-  const card   = document.getElementById(cardId);
+  const card = document.getElementById(cardId);
 
   if (card && e.target === seleccionContainer) {
     seleccionContainer.appendChild(card);
@@ -42,23 +35,18 @@ function handleDrop(e) {
 function handleDropVolver(e) {
   e.preventDefault();
   const cardId = e.dataTransfer.getData("text/plain");
-  const card   = document.getElementById(cardId);
+  const card = document.getElementById(cardId);
 
   if (card && e.target === voluntariadosContainer) {
     voluntariadosContainer.appendChild(card);
 
     const sel = JSON.parse(localStorage.getItem("seleccionVoluntariados")) || [];
-    localStorage.setItem(
-      "seleccionVoluntariados",
-      JSON.stringify(sel.filter(id => id !== cardId))
-    );
+    localStorage.setItem("seleccionVoluntariados", JSON.stringify(sel.filter(id => id !== cardId)));
 
     const quedan = Array.from(seleccionContainer.children).some(el => el.classList.contains("card"));
     if (!quedan) seleccionContainer.innerHTML = "<p>Aquí se mostraría una selección de voluntariados.</p>";
   }
 }
-
-/* ----------  Pintar tarjetas  ---------- */
 
 async function mostrarVoluntariadosHome() {
   if (!voluntariadosContainer) return;
@@ -77,7 +65,7 @@ async function mostrarVoluntariadosHome() {
 
     voluntariados.forEach(v => {
       const cardId = `voluntariado-card-${v.id}`;
-      const card   = document.createElement("div");
+      const card = document.createElement("div");
       card.id = cardId;
       card.className = "card " + (v.tipo === "Oferta" ? "card-oferta" : "card-peticion");
       card.draggable = true;
@@ -104,8 +92,6 @@ async function mostrarVoluntariadosHome() {
   }
 }
 
-/* ----------  INIT  ---------- */
-
 async function initHome() {
   await mostrarVoluntariadosHome();
 
@@ -114,6 +100,15 @@ async function initHome() {
 
   voluntariadosContainer?.addEventListener("dragover", handleDragOver);
   voluntariadosContainer?.addEventListener("drop", handleDropVolver);
+
+  // Mostrar selección si ya existe
+  const sel = JSON.parse(localStorage.getItem("seleccionVoluntariados")) || [];
+  if (sel.length > 0) {
+    sel.forEach(id => {
+      const card = document.getElementById(id);
+      if (card) seleccionContainer.appendChild(card);
+    });
+  }
 }
 
 document.addEventListener("DOMContentLoaded", () => {
