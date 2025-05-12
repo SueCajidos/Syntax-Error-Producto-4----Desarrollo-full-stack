@@ -26,6 +26,25 @@ export async function eliminarUsuario(correo) {
 }
 
 /* ---------- VOLUNTARIADOS ---------- */
+
+
+export async function guardarSeleccionVoluntariado(usuarioId, listaIds) {
+  const m = `mutation($id: ID!, $vols: [String!]!) {
+    guardarSeleccion(usuarioId: $id, voluntariados: $vols)
+  }`;
+  await gql(m, { id: usuarioId, vols: listaIds });
+}
+
+export async function obtenerSeleccionVoluntariado(usuarioId) {
+  const q = `query($id: ID!) {
+    obtenerSeleccion(usuarioId: $id)
+  }`;
+  const { obtenerSeleccion } = await gql(q, { id: usuarioId });
+  return obtenerSeleccion; // array de ids
+}
+
+
+
 export async function obtenerVoluntariados() {
   const q = /* lenguaje graphql */ `
     query {
@@ -62,10 +81,10 @@ export async function guardarVoluntariado(v) {
     }
   `;
   await gql(m, {
-    t:  v.titulo,
-    u:  v.usuario,
-    f:  v.fecha,
-    d:  v.descripcion,
+    t: v.titulo,
+    u: v.usuario,
+    f: v.fecha,
+    d: v.descripcion,
     tp: v.tipo
   });
 }

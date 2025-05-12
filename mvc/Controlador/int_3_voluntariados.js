@@ -10,16 +10,16 @@ import {
 } from '../modelo/almacenaje.js';
 
 /* ---------- nodos DOM ---------- */
-const tbody   = document.querySelector('#tablaVoluntariados tbody');
-const form    = document.getElementById('formVoluntariado');
+const tbody = document.querySelector('#tablaVoluntariados tbody');
+const form = document.getElementById('formVoluntariado');
 const inpMail = document.getElementById('usuario');
-const canvas  = document.getElementById('graficoVoluntariados');
-const ctx     = canvas.getContext('2d');
+const canvas = document.getElementById('graficoVoluntariados');
+const ctx = canvas.getContext('2d');
 
-/* ============================================================== 
+/* ==============================================================
  * TABLA
  * ==============================================================*/
-export async function cargarTabla () {
+export async function cargarTabla() {
   const usuario = obtenerUsuarioActivo();
   tbody.innerHTML = '';
 
@@ -68,9 +68,9 @@ export async function cargarTabla () {
     });
 }
 
-// ============================================================== 
+// ==============================================================
 // ALTA
-// ============================================================== 
+// ==============================================================
 async function altaVoluntariado(ev) {
   ev.preventDefault();
 
@@ -107,10 +107,10 @@ async function altaVoluntariado(ev) {
   dibujarGrafico();
 }
 
-/* ============================================================== 
+/* ==============================================================
  * GRÁFICO
  * ==============================================================*/
-async function dibujarGrafico () {
+async function dibujarGrafico() {
   const datos = await obtenerVoluntariados();
 
   const tot = {};                               // { correo: {Petición, Oferta} }
@@ -121,7 +121,7 @@ async function dibujarGrafico () {
   });
 
   // ---------- canvas ----------
-  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   const users = Object.keys(tot);
   if (!users.length) return;
@@ -129,31 +129,31 @@ async function dibujarGrafico () {
   const pet = users.map(u => tot[u].Petición);
   const off = users.map(u => tot[u].Oferta);
 
-  const BAR=30,GAP=40,SEP=10,SCALE=30,Y0=canvas.height-50,X0=80;
+  const BAR = 30, GAP = 40, SEP = 10, SCALE = 30, Y0 = canvas.height - 50, X0 = 80;
 
-  users.forEach((u,i) => {
-    const x = X0 + i*(BAR*2+GAP) + SEP;
+  users.forEach((u, i) => {
+    const x = X0 + i * (BAR * 2 + GAP) + SEP;
     ctx.fillStyle = '#ff6b6b';
-    ctx.fillRect(x,           Y0-pet[i]*SCALE, BAR, pet[i]*SCALE);
+    ctx.fillRect(x, Y0 - pet[i] * SCALE, BAR, pet[i] * SCALE);
     ctx.fillStyle = '#4d96ff';
-    ctx.fillRect(x+BAR+SEP,   Y0-off[i]*SCALE, BAR, off[i]*SCALE);
+    ctx.fillRect(x + BAR + SEP, Y0 - off[i] * SCALE, BAR, off[i] * SCALE);
   });
 
   // ejes
   ctx.beginPath();
-  ctx.moveTo(X0, Y0); ctx.lineTo(X0 + users.length*(BAR*2+GAP), Y0);
+  ctx.moveTo(X0, Y0); ctx.lineTo(X0 + users.length * (BAR * 2 + GAP), Y0);
   ctx.moveTo(X0, Y0); ctx.lineTo(X0, 20);
-  ctx.strokeStyle='#555'; ctx.lineWidth=2; ctx.stroke();
+  ctx.strokeStyle = '#555'; ctx.lineWidth = 2; ctx.stroke();
 
   // etiquetas
-  ctx.font="13px Quicksand, sans-serif"; ctx.fillStyle="#000"; ctx.textAlign="center";
-  users.forEach((u,i) => {
-    const x = X0 + i*(BAR*2+GAP) + BAR + SEP/2;
-    ctx.fillText(u, x, Y0+15);
+  ctx.font = "13px Quicksand, sans-serif"; ctx.fillStyle = "#000"; ctx.textAlign = "center";
+  users.forEach((u, i) => {
+    const x = X0 + i * (BAR * 2 + GAP) + BAR + SEP / 2;
+    ctx.fillText(u, x, Y0 + 15);
   });
 }
 
-/* ============================================================== 
+/* ==============================================================
  * INIT
  * ==============================================================*/
 document.addEventListener('DOMContentLoaded', async () => {

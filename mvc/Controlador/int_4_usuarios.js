@@ -16,16 +16,16 @@ const filaHTML = (u, esAdmin) => `
      <td>${u.password}</td>
      <td>
        ${esAdmin
-         ? `<button class="btn btn-sm btn-danger borrar" data-correo="${u.correo}">
+    ? `<button class="btn btn-sm btn-danger borrar" data-correo="${u.correo}">
               Borrar
             </button>`
-         : `<span class="text-muted">—</span>`}
+    : `<span class="text-muted">—</span>`}
      </td>
   </tr>`;
 
 // ---------- listado ----------
-async function pintarTabla () {
-  const tbody   = document.getElementById('tablaUsuarios');
+async function pintarTabla() {
+  const tbody = document.getElementById('tablaUsuarios');
   const usuario = obtenerUsuarioActivo();
   const esAdmin = usuario?.rol === "admin";
 
@@ -50,11 +50,11 @@ async function pintarTabla () {
 }
 
 // ---------- alta ----------
-async function alta (e) {
+async function alta(e) {
   e.preventDefault();
   const ok = await guardarUsuario({
-    nombre:   nombre.value.trim(),
-    correo:   correo.value.trim(),
+    nombre: nombre.value.trim(),
+    correo: correo.value.trim(),
     password: password.value
   });
   if (!ok) return alert('Ese correo ya existe');

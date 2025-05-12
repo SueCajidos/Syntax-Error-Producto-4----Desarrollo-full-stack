@@ -1,14 +1,14 @@
 // ---------------- CONFIG BÁSICA ----------------
 require('dotenv').config();
-const express        = require('express');
-const cors           = require('cors');
+const express = require('express');
+const cors = require('cors');
 const { graphqlHTTP } = require('express-graphql');
 const { buildSchema } = require('graphql');
 
 const connectDB = require('./server/config/db');
 connectDB();
 
-const Usuario      = require('./server/models/Usuario');
+const Usuario = require('./server/models/Usuario');
 const Voluntariado = require('./server/models/Voluntariado');
 
 // ---------------- ESQUEMA ----------------------
@@ -19,6 +19,8 @@ const schema = buildSchema(`
   correo: String!
   password: String!
   rol: String!
+  seleccionVoluntariados: [String]
+
   }
 
   type Voluntariado {
@@ -33,25 +35,34 @@ const schema = buildSchema(`
   type Query {
     obtenerUsuarios: [Usuario]
     obtenerVoluntariados: [Voluntariado]
+    obtenerSeleccion(usuarioId: ID!): [String]
   }
 
   type Mutation {
-    crearUsuario(nombre:String!, correo:String!, password:String!, rol:String): Usuario
-    eliminarUsuario(correo:String!): Boolean
-    login(correo:String!, password:String!): Usuario
-    
-    crearVoluntariado(
-      titulo:String!, usuario:String!,
-      fecha:String!,  descripcion:String!, tipo:String!
-    ): Voluntariado
+   crearUsuario(nombre:String!, correo:String!, password:String!, rol:String): Usuario
+  eliminarUsuario(correo:String!): Boolean
+  login(correo:String!, password:String!): Usuario
 
-    eliminarVoluntariado(id:ID!): Boolean
+  crearVoluntariado(
+    titulo:String!, usuario:String!,
+    fecha:String!,  descripcion:String!, tipo:String!
+  ): Voluntariado
+
+  eliminarVoluntariado(id:ID!): Boolean
+
+  guardarSeleccion(usuarioId: ID!, voluntariados: [String]!): String
   }
 `);
 
 // ---------------- RESOLVERS --------------------
 const root = {
   /* --- USUARIOS --- */
+
+  obtenerSeleccion: async ({ usuarioId }) => {
+    const usuario = await Usuario.findById(usuarioId);
+    return usuario?.seleccionVoluntariados || [];
+  },
+
   obtenerUsuarios: async () =>
     (await Usuario.find()).map(u => ({ id: u._id.toString(), ...u.toObject() })),
 
@@ -63,32 +74,39 @@ const root = {
     return { id: doc._id.toString(), ...doc.toObject() };
   },
 
+  guardarSeleccion: async ({ usuarioId, voluntariados }) => {
+    await Usuario.findByIdAndUpdate(usuarioId, {
+      seleccionVoluntariados: voluntariados
+    });
+    return 'Selección guardada';
+  },
+
   eliminarUsuario: async ({ correo }) =>
     (await Usuario.deleteOne({ correo })).deletedCount > 0,
 
   login: async ({ correo, password }) => {
-  const usr = await Usuario.findOne({ correo });
-  if (!usr || usr.password !== password) return null;
+    const usr = await Usuario.findOne({ correo });
+    if (!usr || usr.password !== password) return null;
 
-  return {
-    id: usr._id.toString(),
-    nombre: usr.nombre,
-    correo: usr.correo,
-    rol: usr.rol
-  };
-},
+    return {
+      id: usr._id.toString(),
+      nombre: usr.nombre,
+      correo: usr.correo,
+      rol: usr.rol
+    };
+  },
 
 
   /* --- VOLUNTARIADOS --- */
   obtenerVoluntariados: async () => {
     const vol = await Voluntariado.find().populate('usuario', 'nombre correo');
     return vol.map(v => ({
-      id:   v.id,
+      id: v.id,
       titulo: v.titulo,
       usuario: v.usuario,                    // { nombre, correo }
       fecha: v.fecha.toISOString().slice(0, 10), // ← "YYYY-MM-DD"
       descripcion: v.descripcion,
-      tipo:  v.tipo
+      tipo: v.tipo
     }));
   },
 

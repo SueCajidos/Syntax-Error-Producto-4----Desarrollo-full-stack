@@ -3,13 +3,13 @@
 //  Menú superior: muestra usuario activo y permite cerrar sesión
 // --------------------------------------------------------------
 
-import { obtenerUsuarioActivo, cerrarSesion } from "../Modelo/almacenaje.js";
+import { obtenerUsuarioActivo, cerrarSesion } from "../modelo/almacenaje.js";
 
 /* ----------  PINTAR MENÚ  ---------- */
 function mostrarUsuarioActivo() {
-  const navUsuario   = document.getElementById("navUsuario");
+  const navUsuario = document.getElementById("navUsuario");
   const registerLink = document.getElementById("registerLink");
-  const usuario      = obtenerUsuarioActivo();
+  const usuario = obtenerUsuarioActivo();
 
   if (!navUsuario) return;
 

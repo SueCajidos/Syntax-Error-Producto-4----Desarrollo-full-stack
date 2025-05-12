@@ -7,13 +7,13 @@ import {
   loguearUsuario,
   obtenerUsuarioActivo,
   cerrarSesion
-} from "../Modelo/almacenaje.js";   
+} from "../modelo/almacenaje.js";
 
 /* ----------  SUBMIT LOGIN  ---------- */
 async function loguear(event) {
   event.preventDefault();
 
-  const correo   = document.getElementById("email").value;
+  const correo = document.getElementById("email").value;
   const password = document.getElementById("password").value;
 
   const ok = await loguearUsuario(correo, password);   // ⇠ ahora async

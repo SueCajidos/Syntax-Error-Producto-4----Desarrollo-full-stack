@@ -1,4 +1,9 @@
-import { obtenerVoluntariados } from "../modelo/almacenaje.js";
+import {
+  obtenerVoluntariados,
+  obtenerUsuarioActivo,
+  obtenerSeleccionVoluntariado,
+  guardarSeleccionVoluntariado
+} from "../modelo/almacenaje.js";
 
 const voluntariadosContainer = document.getElementById("voluntariadosContainer");
 const seleccionContainer = document.getElementById("seleccionVoluntariadosContainer");
@@ -13,7 +18,7 @@ function handleDragOver(e) {
   e.dataTransfer.dropEffect = "move";
 }
 
-function handleDrop(e) {
+async function handleDrop(e) {
   e.preventDefault();
   const cardId = e.dataTransfer.getData("text/plain");
   const card = document.getElementById(cardId);
@@ -24,15 +29,20 @@ function handleDrop(e) {
     const ph = seleccionContainer.querySelector("p");
     if (ph && seleccionContainer.children.length > 1) ph.remove();
 
-    const sel = JSON.parse(localStorage.getItem("seleccionVoluntariados")) || [];
-    if (!sel.includes(cardId)) {
-      sel.push(cardId);
-      localStorage.setItem("seleccionVoluntariados", JSON.stringify(sel));
+    const usuario = obtenerUsuarioActivo();
+    if (!usuario) return;
+
+    let seleccion = await obtenerSeleccionVoluntariado(usuario.id);
+    const idPuro = cardId.replace("voluntariado-card-", "");
+    if (!seleccion.includes(idPuro)) {
+      seleccion.push(idPuro);
+      await guardarSeleccionVoluntariado(usuario.id, seleccion);
     }
+
   }
 }
 
-function handleDropVolver(e) {
+async function handleDropVolver(e) {
   e.preventDefault();
   const cardId = e.dataTransfer.getData("text/plain");
   const card = document.getElementById(cardId);
@@ -40,11 +50,19 @@ function handleDropVolver(e) {
   if (card && e.target === voluntariadosContainer) {
     voluntariadosContainer.appendChild(card);
 
-    const sel = JSON.parse(localStorage.getItem("seleccionVoluntariados")) || [];
-    localStorage.setItem("seleccionVoluntariados", JSON.stringify(sel.filter(id => id !== cardId)));
+    const usuario = obtenerUsuarioActivo();
+    if (!usuario) return;
+
+    let seleccion = await obtenerSeleccionVoluntariado(usuario.id);
+    const idPuro = cardId.replace("voluntariado-card-", "");
+    seleccion = seleccion.filter(id => id !== idPuro);
+    await guardarSeleccionVoluntariado(usuario.id, seleccion);
+
 
     const quedan = Array.from(seleccionContainer.children).some(el => el.classList.contains("card"));
-    if (!quedan) seleccionContainer.innerHTML = "<p>Aquí se mostraría una selección de voluntariados.</p>";
+    if (!quedan) {
+      seleccionContainer.innerHTML = "<p>Aquí se mostraría una selección de voluntariados.</p>";
+    }
   }
 }
 
@@ -56,7 +74,8 @@ async function mostrarVoluntariadosHome() {
 
   try {
     const voluntariados = await obtenerVoluntariados();
-    const seleccion = JSON.parse(localStorage.getItem("seleccionVoluntariados")) || [];
+    const usuario = obtenerUsuarioActivo();
+    const seleccion = usuario ? await obtenerSeleccionVoluntariado(usuario.id) : [];
 
     if (!voluntariados.length) {
       voluntariadosContainer.innerHTML = "<p>No hay voluntariados disponibles actualmente.</p>";
@@ -79,12 +98,16 @@ async function mostrarVoluntariadosHome() {
       `;
       card.addEventListener("dragstart", handleDragStart);
 
-      if (seleccion.includes(cardId)) {
+      if (seleccion.includes(v.id)) {
         seleccionContainer.querySelector("p")?.remove();
         seleccionContainer.appendChild(card);
       } else {
         voluntariadosContainer.appendChild(card);
       }
+
+      card.addEventListener("dragstart", handleDragStart);
+
+
     });
   } catch (err) {
     console.error("Error al cargar voluntariados:", err);
@@ -101,22 +124,14 @@ async function initHome() {
   voluntariadosContainer?.addEventListener("dragover", handleDragOver);
   voluntariadosContainer?.addEventListener("drop", handleDropVolver);
 
-  // Mostrar selección si ya existe
-  const sel = JSON.parse(localStorage.getItem("seleccionVoluntariados")) || [];
-  if (sel.length > 0) {
-    sel.forEach(id => {
-      const card = document.getElementById(id);
-      if (card) seleccionContainer.appendChild(card);
-    });
-  }
-}
-
-document.addEventListener("DOMContentLoaded", () => {
-  initHome();
-
   const btnVaciar = document.getElementById("vaciarSeleccion");
-  btnVaciar?.addEventListener("click", () => {
-    localStorage.removeItem("seleccionVoluntariados");
+  btnVaciar?.addEventListener("click", async () => {
+    const usuario = obtenerUsuarioActivo();
+    if (!usuario) return;
+
+    await guardarSeleccionVoluntariado(usuario.id, []);
     location.reload();
   });
-});
+}
+
+document.addEventListener("DOMContentLoaded", initHome);
