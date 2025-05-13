@@ -5,11 +5,17 @@ const ENDPOINT = 'http://localhost:4000/graphql';
  * Lanza Error si el servidor responde con `errors`.
  */
 export async function gql(query, variables = {}) {
-  console.log('➡️ GraphQL payload', { query, variables });
+  const usuario = JSON.parse(localStorage.getItem('usuarioActivo'));
+  const token = usuario?.token;
+
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(token && { Authorization: `Bearer ${token}` })  // 👈 AÑADE el token si existe
+  };
 
   const res = await fetch(ENDPOINT, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({ query, variables })
   });
 
@@ -17,3 +23,4 @@ export async function gql(query, variables = {}) {
   if (errors) throw new Error(errors.map(e => e.message).join(' | '));
   return data;
 }
+

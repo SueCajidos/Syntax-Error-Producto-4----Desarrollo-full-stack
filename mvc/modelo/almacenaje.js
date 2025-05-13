@@ -67,6 +67,7 @@ export async function obtenerVoluntariados() {
 }
 
 export async function guardarVoluntariado(v) {
+  console.log('📤 Enviando voluntariado desde frontend:', v); 
   const m = /* lenguaje graphql */ `
     mutation($t: String!, $u: String!, $f: String!, $d: String!, $tp: String!) {
       crearVoluntariado(
@@ -107,6 +108,7 @@ export async function loguearUsuario(correo, password) {
                  nombre
                  correo
                  rol
+                 token
                }
              }`;
   const { login } = await gql(m, { c: correo, p: password });

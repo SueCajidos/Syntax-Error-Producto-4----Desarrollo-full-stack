@@ -4,12 +4,21 @@ const express = require('express');
 const cors = require('cors');
 const { graphqlHTTP } = require('express-graphql');
 const { buildSchema } = require('graphql');
+const jwt = require('jsonwebtoken');
 
 const connectDB = require('./server/config/db');
 connectDB();
 
 const Usuario = require('./server/models/Usuario');
 const Voluntariado = require('./server/models/Voluntariado');
+
+const authMiddleware = require('./server/middleware/auth');
+
+const app = express();            // ← esta línea estaba faltando
+
+app.use(cors());
+app.use(authMiddleware);         // ← ahora sí funciona correctamente
+
 
 // ---------------- ESQUEMA ----------------------
 const schema = buildSchema(`
@@ -20,6 +29,7 @@ const schema = buildSchema(`
   password: String!
   rol: String!
   seleccionVoluntariados: [String]
+  token: String
 
   }
 
@@ -63,8 +73,20 @@ const root = {
     return usuario?.seleccionVoluntariados || [];
   },
 
-  obtenerUsuarios: async () =>
-    (await Usuario.find()).map(u => ({ id: u._id.toString(), ...u.toObject() })),
+  obtenerUsuarios: async (args, req) => {
+  if (!req.user) {
+    throw new Error("No autenticado");
+  }
+
+  if (req.user.rol !== "admin") {
+    throw new Error("Acceso denegado: solo el administrador puede ver los usuarios");
+  }
+
+  return (await Usuario.find()).map(u => ({
+    id: u._id.toString(),
+    ...u.toObject()
+  }));
+},
 
   crearUsuario: async ({ nombre, correo, password, rol }) => {
     if (await Usuario.exists({ correo })) throw new Error('Correo ya registrado');
@@ -81,55 +103,106 @@ const root = {
     return 'Selección guardada';
   },
 
-  eliminarUsuario: async ({ correo }) =>
-    (await Usuario.deleteOne({ correo })).deletedCount > 0,
+  eliminarUsuario: async ({ correo }, req) => {
+  if (!req.user || req.user.rol !== 'admin') {
+    throw new Error('Solo el administrador puede eliminar usuarios');
+  }
 
-  login: async ({ correo, password }) => {
-    const usr = await Usuario.findOne({ correo });
-    if (!usr || usr.password !== password) return null;
+  return (await Usuario.deleteOne({ correo })).deletedCount > 0;
+},
 
-    return {
+login: async ({ correo, password }) => {
+  const usr = await Usuario.findOne({ correo });
+  if (!usr || usr.password !== password) return null;
+
+  const token = jwt.sign(
+    {
       id: usr._id.toString(),
-      nombre: usr.nombre,
       correo: usr.correo,
       rol: usr.rol
-    };
-  },
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: '2h' }
+  );
 
+  return {
+    id: usr._id.toString(),
+    nombre: usr.nombre,
+    correo: usr.correo,
+    rol: usr.rol,
+    token 
+  };
+},
 
   /* --- VOLUNTARIADOS --- */
-  obtenerVoluntariados: async () => {
-    const vol = await Voluntariado.find().populate('usuario', 'nombre correo');
+    obtenerVoluntariados: async (args, req) => {
+    if (!req.user) throw new Error('No autenticado');
+
+    const filtro = req.user.rol === 'admin'
+      ? {}
+      : { usuario: req.user.id };
+
+    const vol = await Voluntariado.find(filtro).populate('usuario', 'nombre correo');
+
     return vol.map(v => ({
       id: v.id,
       titulo: v.titulo,
-      usuario: v.usuario,                    // { nombre, correo }
-      fecha: v.fecha.toISOString().slice(0, 10), // ← "YYYY-MM-DD"
+      usuario: v.usuario,
+      fecha: v.fecha.toISOString().slice(0, 10),
       descripcion: v.descripcion,
       tipo: v.tipo
     }));
   },
 
-  crearVoluntariado: async ({ titulo, usuario, fecha, descripcion, tipo }) => {
-    const autor = await Usuario.findOne({ correo: usuario });
-    if (!autor) throw new Error('Usuario no existe');
+ crearVoluntariado: async ({ titulo, usuario, fecha, descripcion, tipo }) => {
+  console.log('📥 Datos recibidos:', { titulo, usuario, fecha, descripcion, tipo });
 
-    const doc = await Voluntariado.create({
-      titulo, usuario: autor._id, fecha, descripcion, tipo
-    });
+  const autor = await Usuario.findOne({ correo: usuario });
+  if (!autor) {
+    console.warn('❌ Usuario no encontrado con correo:', usuario);
+    throw new Error('Usuario no existe');
+  }
 
-    // devolvemos objeto completo para pruebas (el front no lo usa)
-    return { id: doc.id, titulo, usuario: autor, fecha, descripcion, tipo };
-  },
+  console.log('👤 Usuario encontrado:', autor._id);
+
+  const doc = await Voluntariado.create({
+    titulo,
+    usuario: autor._id,
+    fecha,
+    descripcion,
+    tipo
+  });
+
+  console.log('✅ Voluntariado guardado:', doc);
+
+  return {
+    id: doc.id,
+    titulo,
+    usuario: autor,
+    fecha,
+    descripcion,
+    tipo
+  };
+},
 
   eliminarVoluntariado: async ({ id }) =>
     (await Voluntariado.deleteOne({ _id: id })).deletedCount > 0
 };
 
 // ---------------- SERVER -----------------------
-const app = express();
+
 app.use(cors());
-app.use('/graphql', graphqlHTTP({ schema, rootValue: root, graphiql: true }));
+app.use(authMiddleware);
+
+app.use('/graphql', graphqlHTTP((req) => {
+  return {
+    schema,
+    rootValue: root,
+    graphiql: true,
+    context: req // ← req ya viene procesado por el middleware
+  };
+}));
+
 
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () =>
