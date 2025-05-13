@@ -1,172 +1,254 @@
-// index.js
-
-// ---------------------
-// IMPORTACIONES BÁSICAS
-// ---------------------
+// ---------------- CONFIG BÁSICA ----------------
+require('dotenv').config();
 const express = require('express');
+const cors = require('cors');
 const { graphqlHTTP } = require('express-graphql');
 const { buildSchema } = require('graphql');
-const cors = require('cors'); // Para evitar problemas CORS
+const jwt = require('jsonwebtoken');
 
-// -----------------------------
-// IMPORTAMOS LOS MODELOS (MEMORIA)
-// -----------------------------
-const Usuario = require('./mvc/modelo/Usuario');
-const Voluntariado = require('./mvc/modelo/Voluntariado');
+const connectDB = require('./server/config/db');
+connectDB();
 
-// Estructuras de memoria para simular la persistencia
-const usuarios = [];
-const voluntariados = [];
-// ---------------------
-// CONEXIÓN A MONGODB
-// ---------------------
-const { MongoClient, ObjectId } = require('mongodb');
-const uri = 'mongodb://localhost:27017';
-const client = new MongoClient(uri);
-let db;
+const Usuario = require('./server/models/Usuario');
+const Voluntariado = require('./server/models/Voluntariado');
 
-client.connect()
-  .then(() => {
-    db = client.db('producto3');
-    console.log(" Conectado a MongoDB - Base de datos: producto3");
-  })
-  .catch(err => console.error(" Error al conectar a MongoDB:", err));
-// -----------------------------
-// DEFINIMOS EL ESQUEMA GRAPHQL
-// -----------------------------
+const authMiddleware = require('./server/middleware/auth');
+
+const app = express();            // ← esta línea estaba faltando
+
+app.use(cors());
+app.use(authMiddleware);         // ← ahora sí funciona correctamente
+
+
+// ---------------- ESQUEMA ----------------------
 const schema = buildSchema(`
-
-  # Tipos de datos
   type Usuario {
-    nombre: String
-    correo: String
-    password: String
+  id: ID!
+  nombre: String!
+  correo: String!
+  password: String!
+  rol: String!
+  seleccionVoluntariados: [String]
+  token: String
+
   }
 
   type Voluntariado {
-    id: ID
-    titulo: String
-    usuario: String
-    fecha: String
+    id: ID!
+    titulo: String!
+    usuario: Usuario!
+    fecha: String!
     descripcion: String
-    tipo: String
+    tipo: String!
   }
 
-  # Consultas
   type Query {
     obtenerUsuarios: [Usuario]
     obtenerVoluntariados: [Voluntariado]
+    obtenerSeleccion(usuarioId: ID!): [String]
   }
 
-  # Mutaciones
   type Mutation {
-    crearUsuario(nombre: String!, correo: String!, password: String!): Usuario
-    eliminarUsuario(correo: String!): Boolean
+   crearUsuario(nombre:String!, correo:String!, password:String!, rol:String): Usuario
+  eliminarUsuario(correo:String!): Boolean
+  login(correo:String!, password:String!): Usuario
 
-    crearVoluntariado(id: ID!, titulo: String!, usuario: String!, fecha: String!, descripcion: String!, tipo: String!): Voluntariado
-    eliminarVoluntariado(id: ID!): Boolean
+  crearVoluntariado(
+    titulo:String!, usuario:String!,
+    fecha:String!,  descripcion:String!, tipo:String!
+  ): Voluntariado
+
+  eliminarVoluntariado(id:ID!): Boolean
+
+  guardarSeleccion(usuarioId: ID!, voluntariados: [String]!): String
   }
 `);
 
-// -----------------------------
-// DEFINIMOS LOS RESOLVERS
-// -----------------------------
+// ---------------- RESOLVERS --------------------
 const root = {
-  // ----------- USUARIOS -----------
-  obtenerUsuarios: async () => {
-    const coleccion = db.collection('usuarios');
-    const resultado = await coleccion.find().toArray();
-    return resultado;
+  /* --- USUARIOS --- */
 
-    /*
-    return usuarios;
-    */
+  obtenerSeleccion: async ({ usuarioId }) => {
+    const usuario = await Usuario.findById(usuarioId);
+    return usuario?.seleccionVoluntariados || [];
   },
 
-  crearUsuario: async ({ nombre, correo, password }) => {
-    const coleccion = db.collection('usuarios');
-    const existe = await coleccion.findOne({ correo: correo });
-    if (existe) {
-      throw new Error("Correo ya registrado");
-    }
-    const nuevo = { nombre, correo, password };
-    await coleccion.insertOne(nuevo);
-    return nuevo;
-
-    /*
-    if (usuarios.find(u => u.correo === correo)) {
-      throw new Error("Correo ya registrado");
-    }
-    const nuevo = new Usuario(nombre, correo, password);
-    usuarios.push(nuevo);
-    return nuevo;
-    */
-  },
-
-  eliminarUsuario: async ({ correo }) => {
-    const coleccion = db.collection('usuarios');
-    const resultado = await coleccion.deleteOne({ correo: correo });
-    return resultado.deletedCount > 0;
-
-    /*
-    const index = usuarios.findIndex(u => u.correo === correo);
-    if (index === -1) return false;
-    usuarios.splice(index, 1);
-    return true;
-    */
-  },
-
-  // ----------- VOLUNTARIADOS -----------
-  obtenerVoluntariados: async () => {
-    const coleccion = db.collection('voluntariados');
-    const resultado = await coleccion.find().toArray();
-    return resultado;
-
-    /*
-    return voluntariados;
-    */
-  },
-
-  crearVoluntariado: async ({ id, titulo, usuario, fecha, descripcion, tipo }) => {
-    const coleccion = db.collection('voluntariados');
-    const nuevo = { id, titulo, usuario, fecha, descripcion, tipo };
-    await coleccion.insertOne(nuevo);
-    return nuevo;
-
-    /*
-    const nuevo = new Voluntariado(id, titulo, usuario, fecha, descripcion, tipo);
-    voluntariados.push(nuevo);
-    return nuevo;
-    */
-  },
-
-  eliminarVoluntariado: async ({ id }) => {
-    const coleccion = db.collection('voluntariados');
-    const resultado = await coleccion.deleteOne({ id: id });
-    return resultado.deletedCount > 0;
-
-    /*
-    const index = voluntariados.findIndex(v => v.id == id);
-    if (index === -1) return false;
-    voluntariados.splice(index, 1);
-    return true;
-    */
+  obtenerUsuarios: async (args, req) => {
+  if (!req.user) {
+    throw new Error("No autenticado");
   }
+
+  if (req.user.rol !== "admin") {
+    throw new Error("Acceso denegado: solo el administrador puede ver los usuarios");
+  }
+
+  return (await Usuario.find()).map(u => ({
+    id: u._id.toString(),
+    ...u.toObject()
+  }));
+},
+
+  crearUsuario: async ({ nombre, correo, password, rol }) => {
+    if (await Usuario.exists({ correo })) throw new Error('Correo ya registrado');
+
+    const doc = await Usuario.create({ nombre, correo, password, rol });
+    console.log('👍 insertado →', doc);               // ← lo verás en consola
+    return { id: doc._id.toString(), ...doc.toObject() };
+  },
+
+  guardarSeleccion: async ({ usuarioId, voluntariados }) => {
+    await Usuario.findByIdAndUpdate(usuarioId, {
+      seleccionVoluntariados: voluntariados
+    });
+    return 'Selección guardada';
+  },
+
+  eliminarUsuario: async ({ correo }, req) => {
+  if (!req.user || req.user.rol !== 'admin') {
+    throw new Error('Solo el administrador puede eliminar usuarios');
+  }
+
+  return (await Usuario.deleteOne({ correo })).deletedCount > 0;
+},
+
+login: async ({ correo, password }) => {
+  const usr = await Usuario.findOne({ correo });
+  if (!usr || usr.password !== password) return null;
+
+  const token = jwt.sign(
+    {
+      id: usr._id.toString(),
+      correo: usr.correo,
+      rol: usr.rol
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: '2h' }
+  );
+
+  return {
+    id: usr._id.toString(),
+    nombre: usr.nombre,
+    correo: usr.correo,
+    rol: usr.rol,
+    token 
+  };
+},
+
+  /* --- VOLUNTARIADOS --- */
+    obtenerVoluntariados: async (args, req) => {
+    if (!req.user) throw new Error('No autenticado');
+
+    const filtro = req.user.rol === 'admin'
+      ? {}
+      : { usuario: req.user.id };
+
+    const vol = await Voluntariado.find(filtro).populate('usuario', 'nombre correo');
+
+    return vol.map(v => ({
+      id: v.id,
+      titulo: v.titulo,
+      usuario: v.usuario,
+      fecha: v.fecha.toISOString().slice(0, 10),
+      descripcion: v.descripcion,
+      tipo: v.tipo
+    }));
+  },
+
+ crearVoluntariado: async ({ titulo, usuario, fecha, descripcion, tipo }) => {
+  console.log('📥 Datos recibidos:', { titulo, usuario, fecha, descripcion, tipo });
+
+  const autor = await Usuario.findOne({ correo: usuario });
+  if (!autor) {
+    console.warn('❌ Usuario no encontrado con correo:', usuario);
+    throw new Error('Usuario no existe');
+  }
+
+  console.log('👤 Usuario encontrado:', autor._id);
+
+  const doc = await Voluntariado.create({
+    titulo,
+    usuario: autor._id,
+    fecha,
+    descripcion,
+    tipo
+  });
+
+  console.log('✅ Voluntariado guardado:', doc);
+
+  return {
+    id: doc.id,
+    titulo,
+    usuario: autor,
+    fecha,
+    descripcion,
+    tipo
+  };
+},
+
+  eliminarVoluntariado: async ({ id }) =>
+    (await Voluntariado.deleteOne({ _id: id })).deletedCount > 0
 };
 
-// -----------------------------
-// CONFIGURACIÓN DEL SERVIDOR
-// -----------------------------
-const app = express();
+// ---------------- SERVER -----------------------
+
+// app.use(cors());
+// app.use(authMiddleware);
+
+// app.use('/graphql', graphqlHTTP((req) => {
+//   return {
+//     schema,
+//     rootValue: root,
+//     graphiql: true,
+//     context: req // ← req ya viene procesado por el middleware
+//   };
+// }));
+
+
+// const PORT = process.env.PORT || 4000;
+// app.listen(PORT, () =>
+//   console.log(`🚀  GraphQL listo → http://localhost:${PORT}/graphql`)
+// );
+
+const http = require('http');
+const { Server } = require('socket.io');
+const cors = require('cors');
+
+require('dotenv').config();
+
 app.use(cors());
 
-app.use('/graphql', graphqlHTTP({
-  schema: schema,
-  rootValue: root,
-  graphiql: true,
-}));
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
+});
 
-const PORT = 4000;
-app.listen(PORT, () => {
-  console.log(`Servidor corriendo en http://localhost:${PORT}/graphql`);
+// 🔌 WebSocket config
+io.on('connection', (socket) => {
+  console.log('🟢 Cliente conectado vía WebSocket');
+
+  socket.on('nuevo-voluntariado', (data) => {
+    console.log('📦 Nuevo voluntariado recibido:', data);
+    socket.broadcast.emit('voluntariado-actualizado', data);
+  });
+
+  socket.on('disconnect', () => {
+    console.log('🔴 Cliente desconectado');
+  });
+});
+
+// GraphQL config (esto ya lo tienes)
+const { graphqlHTTP } = require('express-graphql');
+const { buildSchema } = require('graphql');
+const connectDB = require('./server/config/db');
+connectDB();
+
+// … tu código GraphQL existente (schema, root, etc.)
+app.use('/graphql', graphqlHTTP({ schema, rootValue: root, graphiql: true }));
+
+const PORT = process.env.PORT || 4000;
+server.listen(PORT, () => {
+  console.log(`🚀 Servidor con WebSocket listo → http://localhost:${PORT}/graphql`);
 });
