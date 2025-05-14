@@ -105,15 +105,6 @@ async function altaVoluntariado(ev) {
   inpMail.value = usr.correo; // repone el correo
   await cargarTabla();
   dibujarGrafico();
-  
-  // Enviar el voluntariado por socket
-  window.socket.emit('nuevo-voluntariado', {
-    titulo: titulo.value,
-    tipo: tipo.value,
-    fecha: fecha.value,
-    descripcion: descripcion.value,
-    usuario: { correo: usr.correo }
-  });
 }
 
 /* ==============================================================
@@ -173,4 +164,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   dibujarGrafico();
 
   form?.addEventListener('submit', altaVoluntariado);
+
+    // 🔊 Escuchar cambios en tiempo real desde el servidor
+  if (window.socket?.on) {
+    window.socket.on('voluntariado-actualizado', async (data) => {
+      console.log('📢 Voluntariado actualizado recibido por WebSocket:', data);
+      await cargarTabla();
+      dibujarGrafico();
+    });
+  }
+
 });

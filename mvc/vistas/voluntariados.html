@@ -89,6 +89,22 @@
 
     <footer class="footer"></footer>
   </div>
+  <!-- Cliente WebSocket desde CDN -->
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <script>
+    const socket = io("http://localhost:4000");
+    window.socket = socket;
+
+    // 👂 Escucha para actualizaciones de voluntariado en tiempo real
+    socket.on('voluntariado-actualizado', () => {
+      console.log('📥 Evento recibido: voluntariado-actualizado');
+      import('../Controlador/int_3_voluntariados.js')
+        .then(mod => {
+          mod.cargarTabla();
+          mod.dibujarGrafico?.();
+        });
+    });
+  </script>
 
   <!-- Controladores principales -->
   <script type="module" src="../Controlador/int_3_voluntariados.js"></script>
