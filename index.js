@@ -212,7 +212,7 @@ io.on('connection', (socket) => {
 
   socket.on('nuevo-voluntariado', (data) => {
     console.log('📦 Nuevo voluntariado recibido:', data);
-    socket.broadcast.emit('voluntariado-actualizado', data);
+    io.emit('voluntariado-actualizado', data);
   });
 
   socket.on('disconnect', () => {
